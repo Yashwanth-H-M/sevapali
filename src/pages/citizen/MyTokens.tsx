@@ -5,6 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Ticket,
   MapPin,
   Calendar,
@@ -13,7 +19,11 @@ import {
   XCircle,
   AlertCircle,
   MoreVertical,
+  Eye,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const MyTokens: React.FC = () => {
   const { language } = useLanguage();
@@ -61,6 +71,18 @@ const MyTokens: React.FC = () => {
     },
   ];
 
+  const handleViewDetails = (tokenId: string) => {
+    toast.info(language === 'mr' ? `टोकन ${tokenId} तपशील` : `Token ${tokenId} details`);
+  };
+
+  const handleRefreshPosition = (tokenId: string) => {
+    toast.success(language === 'mr' ? 'स्थिती अपडेट केली' : 'Status refreshed');
+  };
+
+  const handleCancelToken = (tokenId: string) => {
+    toast.success(language === 'mr' ? 'टोकन रद्द केले' : 'Token cancelled');
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
@@ -94,21 +116,17 @@ const MyTokens: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
               {language === 'mr' ? 'माझे टोकन' : 'My Tokens'}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {language === 'mr'
-                ? 'तुमच्या सर्व टोकनची स्थिती पहा'
-                : 'View the status of all your tokens'}
+              {language === 'mr' ? 'तुमच्या सर्व टोकनची स्थिती पहा' : 'View the status of all your tokens'}
             </p>
           </div>
         </div>
 
-        {/* Tokens List */}
         <div className="space-y-4">
           {tokens.map((token) => (
             <Card key={token.id} variant="elevated" className={token.status === 'active' ? 'border-success/50' : ''}>
@@ -160,9 +178,34 @@ const MyTokens: React.FC = () => {
                     )}
 
                     {(token.status === 'active' || token.status === 'upcoming') && (
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-5 w-5" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewDetails(token.id)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            {language === 'mr' ? 'तपशील पहा' : 'View Details'}
+                          </DropdownMenuItem>
+                          {token.status === 'active' && (
+                            <DropdownMenuItem onClick={() => handleRefreshPosition(token.id)}>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              {language === 'mr' ? 'स्थिती रिफ्रेश करा' : 'Refresh Status'}
+                            </DropdownMenuItem>
+                          )}
+                          {token.status === 'upcoming' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleCancelToken(token.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              {language === 'mr' ? 'टोकन रद्द करा' : 'Cancel Token'}
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 </div>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Bot, Send, Mic, MicOff, Loader2, User, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Message {
   id: string;
@@ -12,6 +13,8 @@ interface Message {
   content: string;
   timestamp: Date;
 }
+
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 const AIAssistant: React.FC = () => {
   const { language } = useLanguage();
@@ -52,33 +55,130 @@ const AIAssistant: React.FC = () => {
     setInputValue('');
     setIsLoading(true);
 
-    // Simulate AI response
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Prepare messages for API (exclude initial greeting for better context)
+    const apiMessages = messages
+      .filter((m) => m.id !== '1')
+      .map((m) => ({ role: m.role, content: m.content }));
+    apiMessages.push({ role: 'user', content: inputValue });
 
-    const responses = language === 'mr' ? [
-      'आपला प्रश्न समजला. RTO सेवांसाठी, तुम्हाला वाहन नोंदणी, परवाना नूतनीकरण, किंवा वाहन हस्तांतरण यासारख्या सेवा मिळतात. तुम्ही आमच्या "टोकन बुक करा" विभागातून सहज टोकन बुक करू शकता.',
-      'शासकीय योजनांबद्दल, महाराष्ट्र सरकारच्या अनेक योजना आहेत जसे की महात्मा फुले जन आरोग्य योजना, लेक लाडकी योजना, आणि शेतकरी सन्मान निधी. "योजना" विभागात तपशील पहा.',
-      'तुम्हाला अधिक माहिती हवी असल्यास, कृपया विशिष्ट प्रश्न विचारा. मी तुम्हाला आवश्यक कागदपत्रे, प्रक्रिया, आणि कार्यालयाची माहिती देऊ शकतो.',
-    ] : [
-      'I understand your query. For RTO services, you can get services like vehicle registration, license renewal, or vehicle transfer. You can easily book a token from our "Book Token" section.',
-      'Regarding government schemes, Maharashtra Government offers many schemes like Mahatma Phule Jan Arogya Yojana, Lek Ladki Yojana, and Farmer Samman Nidhi. Check the "Schemes" section for details.',
-      'If you need more information, please ask specific questions. I can provide you with required documents, procedures, and office information.',
-    ];
+    let assistantContent = '';
+    
+    try {
+      const response = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ messages: apiMessages, language }),
+      });
 
-    const aiMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: responses[Math.floor(Math.random() * responses.length)],
-      timestamp: new Date(),
-    };
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 429) {
+          toast.error(language === 'mr' ? 'खूप जास्त विनंत्या. कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.' : 'Too many requests. Please try again later.');
+        } else if (response.status === 402) {
+          toast.error(language === 'mr' ? 'सेवा उपलब्ध नाही. कृपया नंतर प्रयत्न करा.' : 'Service unavailable. Please try again later.');
+        } else {
+          toast.error(errorData.error || (language === 'mr' ? 'त्रुटी आली' : 'An error occurred'));
+        }
+        setIsLoading(false);
+        return;
+      }
 
-    setMessages((prev) => [...prev, aiMessage]);
-    setIsLoading(false);
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = '';
+      let streamDone = false;
+
+      // Create assistant message placeholder
+      const assistantMessageId = (Date.now() + 1).toString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(),
+        },
+      ]);
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          if (line.startsWith(':') || line.trim() === '') continue;
+          if (!line.startsWith('data: ')) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') {
+            streamDone = true;
+            break;
+          }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantContent += content;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId ? { ...m, content: assistantContent } : m
+                )
+              );
+            }
+          } catch {
+            textBuffer = line + '\n' + textBuffer;
+            break;
+          }
+        }
+      }
+
+      // Final flush
+      if (textBuffer.trim()) {
+        for (let raw of textBuffer.split('\n')) {
+          if (!raw) continue;
+          if (raw.endsWith('\r')) raw = raw.slice(0, -1);
+          if (raw.startsWith(':') || raw.trim() === '') continue;
+          if (!raw.startsWith('data: ')) continue;
+          const jsonStr = raw.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantContent += content;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId ? { ...m, content: assistantContent } : m
+                )
+              );
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      toast.error(language === 'mr' ? 'संदेश पाठवता आला नाही' : 'Failed to send message');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleVoice = () => {
     setIsListening(!isListening);
-    // Voice recognition would be implemented here with Web Speech API
+    toast.info(language === 'mr' ? 'व्हॉइस इनपुट लवकरच उपलब्ध होईल' : 'Voice input coming soon');
   };
 
   const quickQuestions = language === 'mr' ? [
@@ -133,7 +233,7 @@ const AIAssistant: React.FC = () => {
                     : 'bg-muted text-foreground rounded-tl-sm'
                 }`}
               >
-                <p className="text-sm leading-relaxed">{message.content}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                 <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                   {message.timestamp.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                 </p>
@@ -146,7 +246,7 @@ const AIAssistant: React.FC = () => {
             </div>
           ))}
 
-          {isLoading && (
+          {isLoading && messages[messages.length - 1]?.content === '' && (
             <div className="flex gap-3 justify-start">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-primary flex items-center justify-center">
                 <Bot className="h-4 w-4 text-primary-foreground" />
