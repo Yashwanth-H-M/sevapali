@@ -28,8 +28,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isCitizen = role === 'citizen';
-  const basePath = isCitizen ? '/citizen' : '/official';
+  // Determine user type based on current path, not just role (to ensure correct navigation per section)
+  const isCitizenPath = location.pathname.startsWith('/citizen');
+  const isOfficialPath = location.pathname.startsWith('/official');
+  
+  // Use path-based detection for navigation, fall back to role
+  const isCitizen = isCitizenPath || (!isOfficialPath && role === 'citizen');
+  const basePath = isCitizenPath ? '/citizen' : isOfficialPath ? '/official' : (role === 'citizen' ? '/citizen' : '/official');
 
   const citizenMenuItems = [
     { icon: LayoutDashboard, label: language === 'mr' ? 'डॅशबोर्ड' : 'Dashboard', path: `${basePath}/dashboard` },
