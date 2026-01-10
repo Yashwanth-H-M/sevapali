@@ -13,6 +13,7 @@ import OfficialLogin from "./pages/OfficialLogin";
 import OfficialRegister from "./pages/OfficialRegister";
 import Schemes from "./pages/Schemes";
 import About from "./pages/About";
+import Feedback from "./pages/Feedback";
 import CitizenDashboard from "./pages/citizen/CitizenDashboard";
 import BookToken from "./pages/citizen/BookToken";
 import MyTokens from "./pages/citizen/MyTokens";
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/official/register" element={<OfficialRegister />} />
               <Route path="/schemes" element={<Schemes />} />
               <Route path="/about" element={<About />} />
+              <Route path="/feedback" element={<Feedback />} />
               <Route path="/citizen/dashboard" element={<CitizenDashboard />} />
               <Route path="/citizen/book-token" element={<BookToken />} />
               <Route path="/citizen/my-tokens" element={<MyTokens />} />
