@@ -20,12 +20,12 @@ const OfficialLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already authenticated as official
+  // Redirect if already authenticated - official login always goes to official dashboard
   React.useEffect(() => {
-    if (isAuthenticated && role === 'official') {
+    if (isAuthenticated) {
       navigate('/official/dashboard');
     }
-  }, [isAuthenticated, role, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
