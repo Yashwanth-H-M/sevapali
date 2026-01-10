@@ -8,11 +8,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import { User, Briefcase, Mail, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Briefcase, Mail, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
-const Login: React.FC = () => {
-  const { t, language } = useLanguage();
+const OfficialLogin: React.FC = () => {
+  const { language } = useLanguage();
   const { login, role, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   
@@ -20,10 +20,10 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated as official
   React.useEffect(() => {
-    if (isAuthenticated && role) {
-      navigate(role === 'citizen' ? '/citizen/dashboard' : '/official/dashboard');
+    if (isAuthenticated && role === 'official') {
+      navigate('/official/dashboard');
     }
   }, [isAuthenticated, role, navigate]);
 
@@ -33,6 +33,7 @@ const Login: React.FC = () => {
     
     try {
       await login(email, password);
+      // Check role after login
       toast.success(language === 'mr' ? 'लॉगिन यशस्वी!' : 'Login successful!');
     } catch (error: any) {
       toast.error(error.message || (language === 'mr' ? 'लॉगिन अयशस्वी' : 'Login failed'));
@@ -47,28 +48,36 @@ const Login: React.FC = () => {
       
       <main className="container mx-auto px-4 pt-28 pb-20 min-h-screen flex items-center justify-center">
         <div className="w-full max-w-lg">
-          <Card variant="elevated" className="animate-fade-in">
+          <Card variant="elevated" className="animate-fade-in border-accent/20">
             <CardHeader className="text-center pb-2">
-              <div className="w-16 h-16 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <User className="h-8 w-8 text-primary-foreground" />
+              <div className="w-16 h-16 rounded-xl bg-accent flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Briefcase className="h-8 w-8 text-accent-foreground" />
+              </div>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <ShieldCheck className="h-5 w-5 text-accent" />
+                <span className="text-sm font-medium text-accent">
+                  {language === 'mr' ? 'अधिकारी पोर्टल' : 'Official Portal'}
+                </span>
               </div>
               <CardTitle className="text-2xl">
-                {language === 'mr' ? 'नागरिक लॉगिन' : 'Citizen Login'}
+                {language === 'mr' ? 'शासकीय अधिकारी लॉगिन' : 'Government Official Login'}
               </CardTitle>
               <CardDescription>
-                {language === 'mr' ? 'आपल्या खात्यात साइन इन करा' : 'Sign in to your account'}
+                {language === 'mr' ? 'आपल्या अधिकारी खात्यात साइन इन करा' : 'Sign in to your official account'}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">{t.login.email}</Label>
+                  <Label htmlFor="email">
+                    {language === 'mr' ? 'अधिकृत ईमेल' : 'Official Email'}
+                  </Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
-                      placeholder="name@example.com"
+                      placeholder="official@gov.in"
                       className="pl-10"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -78,9 +87,11 @@ const Login: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">{t.login.password}</Label>
-                    <a href="#" className="text-xs text-primary hover:underline">
-                      {t.login.forgotPassword}
+                    <Label htmlFor="password">
+                      {language === 'mr' ? 'पासवर्ड' : 'Password'}
+                    </Label>
+                    <a href="#" className="text-xs text-accent hover:underline">
+                      {language === 'mr' ? 'पासवर्ड विसरलात?' : 'Forgot password?'}
                     </a>
                   </div>
                   <div className="relative">
@@ -100,16 +111,17 @@ const Login: React.FC = () => {
                   type="submit" 
                   className="w-full" 
                   size="lg"
+                  variant="accent"
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                      {t.common.loading}
+                      <span className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" />
+                      {language === 'mr' ? 'लोड होत आहे...' : 'Loading...'}
                     </span>
                   ) : (
                     <>
-                      {t.login.signIn}
+                      {language === 'mr' ? 'साइन इन करा' : 'Sign In'}
                       <ArrowRight className="h-4 w-4 ml-1" />
                     </>
                   )}
@@ -117,19 +129,15 @@ const Login: React.FC = () => {
               </form>
 
               <div className="mt-6 text-center text-sm text-muted-foreground">
-                {t.login.noAccount}{' '}
-                <Link to="/register" className="text-primary font-medium hover:underline">
-                  {t.login.register}
+                {language === 'mr' ? 'नवीन अधिकारी?' : 'New official?'}{' '}
+                <Link to="/official/register" className="text-accent font-medium hover:underline">
+                  {language === 'mr' ? 'नोंदणी करा' : 'Register'}
                 </Link>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-border">
-                <Link to="/official/login">
-                  <Button variant="outline" className="w-full" size="lg">
-                    <Briefcase className="h-4 w-4 mr-2" />
-                    {language === 'mr' ? 'शासकीय अधिकारी लॉगिन' : 'Government Official Login'}
-                    <ShieldCheck className="h-4 w-4 ml-2 text-accent" />
-                  </Button>
+              <div className="mt-4 pt-4 border-t border-border text-center">
+                <Link to="/login" className="text-sm text-muted-foreground hover:text-primary">
+                  {language === 'mr' ? '← नागरिक लॉगिन' : '← Citizen Login'}
                 </Link>
               </div>
             </CardContent>
@@ -142,4 +150,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login;
+export default OfficialLogin;
