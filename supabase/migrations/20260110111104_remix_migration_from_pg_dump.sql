@@ -97,6 +97,25 @@ $$;
 SET default_table_access_method = heap;
 
 --
+-- Name: feedback; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.feedback (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    user_role text NOT NULL,
+    category text NOT NULL,
+    subject text NOT NULL,
+    message text NOT NULL,
+    rating integer,
+    status text DEFAULT 'pending'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT feedback_rating_check CHECK (((rating >= 1) AND (rating <= 5)))
+);
+
+
+--
 -- Name: profiles; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -119,6 +138,14 @@ CREATE TABLE public.user_roles (
     user_id uuid NOT NULL,
     role public.app_role NOT NULL
 );
+
+
+--
+-- Name: feedback feedback_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.feedback
+    ADD CONSTRAINT feedback_pkey PRIMARY KEY (id);
 
 
 --
@@ -154,6 +181,13 @@ ALTER TABLE ONLY public.user_roles
 
 
 --
+-- Name: feedback update_feedback_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON public.feedback FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
 -- Name: profiles update_profiles_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -184,6 +218,13 @@ CREATE POLICY "Service role can manage user roles" ON public.user_roles USING (f
 
 
 --
+-- Name: feedback Users can create feedback; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can create feedback" ON public.feedback FOR INSERT WITH CHECK ((auth.uid() = user_id));
+
+
+--
 -- Name: profiles Users can insert their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -191,10 +232,24 @@ CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT
 
 
 --
+-- Name: feedback Users can update their own pending feedback; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update their own pending feedback" ON public.feedback FOR UPDATE USING (((auth.uid() = user_id) AND (status = 'pending'::text)));
+
+
+--
 -- Name: profiles Users can update their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
 CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING ((auth.uid() = user_id));
+
+
+--
+-- Name: feedback Users can view their own feedback; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view their own feedback" ON public.feedback FOR SELECT USING ((auth.uid() = user_id));
 
 
 --
@@ -210,6 +265,12 @@ CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT U
 
 CREATE POLICY "Users can view their own roles" ON public.user_roles FOR SELECT USING ((auth.uid() = user_id));
 
+
+--
+-- Name: feedback; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: profiles; Type: ROW SECURITY; Schema: public; Owner: -
