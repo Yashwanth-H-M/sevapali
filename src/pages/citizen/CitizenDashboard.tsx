@@ -20,7 +20,7 @@ import {
 
 const CitizenDashboard: React.FC = () => {
   const { language } = useLanguage();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   // Mock data
   const stats = [
@@ -105,7 +105,7 @@ const CitizenDashboard: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              {language === 'mr' ? 'नमस्कार' : 'Welcome'}, {user?.name?.split(' ')[0]}! 👋
+              {language === 'mr' ? 'नमस्कार' : 'Welcome'}, {profile?.full_name?.split(' ')[0] || user?.email?.split('@')[0]}! 👋
             </h1>
             <p className="text-muted-foreground mt-1">
               {language === 'mr'

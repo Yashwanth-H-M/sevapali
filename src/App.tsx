@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Schemes from "./pages/Schemes";
 import CitizenDashboard from "./pages/citizen/CitizenDashboard";
 import BookToken from "./pages/citizen/BookToken";
@@ -29,6 +30,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
               <Route path="/schemes" element={<Schemes />} />
               <Route path="/citizen/dashboard" element={<CitizenDashboard />} />
               <Route path="/citizen/book-token" element={<BookToken />} />

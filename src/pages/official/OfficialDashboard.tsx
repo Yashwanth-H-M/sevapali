@@ -9,7 +9,7 @@ import { Users, Ticket, Clock, TrendingUp, Play, SkipForward, CheckCircle } from
 
 const OfficialDashboard: React.FC = () => {
   const { language } = useLanguage();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const stats = [
     { label: language === 'mr' ? 'आजचे टोकन' : 'Today\'s Tokens', value: '156', icon: Ticket, color: 'bg-primary' },
@@ -29,7 +29,7 @@ const OfficialDashboard: React.FC = () => {
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            {language === 'mr' ? 'नमस्कार' : 'Welcome'}, {user?.name?.split(' ')[0]}! 👋
+            {language === 'mr' ? 'नमस्कार' : 'Welcome'}, {profile?.full_name?.split(' ')[0] || user?.email?.split('@')[0]}! 👋
           </h1>
           <p className="text-muted-foreground">{language === 'mr' ? 'रांग व्यवस्थापन डॅशबोर्ड' : 'Queue Management Dashboard'}</p>
         </div>

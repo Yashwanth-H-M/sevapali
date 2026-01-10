@@ -23,12 +23,12 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { t, language, setLanguage } = useLanguage();
-  const { user, logout } = useAuth();
+  const { user, profile, role, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isCitizen = user?.role === 'citizen';
+  const isCitizen = role === 'citizen';
   const basePath = isCitizen ? '/citizen' : '/official';
 
   const citizenMenuItems = [
@@ -48,8 +48,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
   const menuItems = isCitizen ? citizenMenuItems : officialMenuItems;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
@@ -108,10 +108,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold">
-                {user?.name?.charAt(0) || 'U'}
+                {profile?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{user?.name}</p>
+                <p className="font-medium text-foreground truncate">{profile?.full_name || user?.email}</p>
                 <p className="text-xs text-muted-foreground capitalize">
                   {isCitizen ? (language === 'mr' ? 'नागरिक' : 'Citizen') : (language === 'mr' ? 'अधिकारी' : 'Official')}
                 </p>
