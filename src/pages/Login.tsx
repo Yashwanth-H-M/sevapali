@@ -20,12 +20,12 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated - citizen login always goes to citizen dashboard
   React.useEffect(() => {
-    if (isAuthenticated && role) {
-      navigate(role === 'citizen' ? '/citizen/dashboard' : '/official/dashboard');
+    if (isAuthenticated) {
+      navigate('/citizen/dashboard');
     }
-  }, [isAuthenticated, role, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
