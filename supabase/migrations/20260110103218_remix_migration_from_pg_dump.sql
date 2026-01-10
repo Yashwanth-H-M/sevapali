@@ -177,6 +177,13 @@ ALTER TABLE ONLY public.user_roles
 
 
 --
+-- Name: user_roles Service role can manage user roles; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service role can manage user roles" ON public.user_roles USING (false) WITH CHECK (false);
+
+
+--
 -- Name: profiles Users can insert their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
