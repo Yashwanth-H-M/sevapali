@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      feedback: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          message: string
+          rating: number | null
+          status: string
+          subject: string
+          updated_at: string
+          user_id: string
+          user_role: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          message: string
+          rating?: number | null
+          status?: string
+          subject: string
+          updated_at?: string
+          user_id: string
+          user_role: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          message?: string
+          rating?: number | null
+          status?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+          user_role?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
