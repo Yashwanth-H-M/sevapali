@@ -1,102 +1,154 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useQueueTokens, useTodayStats, useCallNextToken, useUpdateTokenStatus } from '@/hooks/useTokens';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Play, 
   SkipForward, 
-  Pause, 
   CheckCircle, 
   Clock, 
   Users,
   Ticket,
   Volume2,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface QueueItem {
-  id: string;
-  token: string;
-  name: string;
-  service: string;
-  waitTime: string;
-  status: 'waiting' | 'serving' | 'completed' | 'skipped';
-}
-
 const QueueManagement: React.FC = () => {
   const { language } = useLanguage();
+  const queryClient = useQueryClient();
   
-  const [queue, setQueue] = useState<QueueItem[]>([
-    { id: '1', token: 'TK-089', name: 'राहुल शर्मा', service: language === 'mr' ? 'वाहन नोंदणी' : 'Vehicle Registration', waitTime: '5 min', status: 'serving' },
-    { id: '2', token: 'TK-090', name: 'प्रिया पाटील', service: language === 'mr' ? 'परवाना नूतनीकरण' : 'License Renewal', waitTime: '12 min', status: 'waiting' },
-    { id: '3', token: 'TK-091', name: 'अमित देशमुख', service: language === 'mr' ? 'वाहन हस्तांतरण' : 'Vehicle Transfer', waitTime: '18 min', status: 'waiting' },
-    { id: '4', token: 'TK-092', name: 'सुनीता जाधव', service: language === 'mr' ? 'डुप्लिकेट परवाना' : 'Duplicate License', waitTime: '25 min', status: 'waiting' },
-    { id: '5', token: 'TK-093', name: 'विकास कुलकर्णी', service: language === 'mr' ? 'पत्ता बदल' : 'Address Change', waitTime: '32 min', status: 'waiting' },
-  ]);
+  const { data: queueTokens, isLoading, refetch } = useQueueTokens();
+  const { data: stats } = useTodayStats();
+  const callNextMutation = useCallNextToken();
+  const updateStatusMutation = useUpdateTokenStatus();
 
-  const [currentServing, setCurrentServing] = useState<string | null>('TK-089');
+  // Subscribe to realtime updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('queue-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tokens' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['queue-tokens'] });
+          queryClient.invalidateQueries({ queryKey: ['today-stats'] });
+        }
+      )
+      .subscribe();
 
-  const stats = [
-    { label: language === 'mr' ? 'एकूण रांगेत' : 'Total in Queue', value: queue.filter(q => q.status === 'waiting').length, icon: Users, color: 'bg-primary' },
-    { label: language === 'mr' ? 'सध्या सेवा' : 'Currently Serving', value: currentServing || '-', icon: Ticket, color: 'bg-success' },
-    { label: language === 'mr' ? 'सरासरी प्रतीक्षा' : 'Avg. Wait', value: '15 min', icon: Clock, color: 'bg-warning' },
-    { label: language === 'mr' ? 'आज पूर्ण' : 'Completed Today', value: '89', icon: CheckCircle, color: 'bg-accent' },
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  const currentlyServing = queueTokens?.find(t => t.status === 'serving');
+  const waitingQueue = queueTokens?.filter(t => t.status === 'waiting' || t.status === 'pending') || [];
+
+  const statCards = [
+    { 
+      label: language === 'mr' ? 'एकूण रांगेत' : 'Total in Queue', 
+      value: waitingQueue.length, 
+      icon: Users, 
+      color: 'bg-primary' 
+    },
+    { 
+      label: language === 'mr' ? 'सध्या सेवा' : 'Currently Serving', 
+      value: currentlyServing?.token_number || '-', 
+      icon: Ticket, 
+      color: 'bg-success' 
+    },
+    { 
+      label: language === 'mr' ? 'सरासरी प्रतीक्षा' : 'Avg. Wait', 
+      value: '15 min', 
+      icon: Clock, 
+      color: 'bg-warning' 
+    },
+    { 
+      label: language === 'mr' ? 'आज पूर्ण' : 'Completed Today', 
+      value: stats?.served || 0, 
+      icon: CheckCircle, 
+      color: 'bg-accent' 
+    },
   ];
 
-  const callNext = () => {
-    const nextItem = queue.find(q => q.status === 'waiting');
-    if (nextItem) {
-      setQueue(prev => prev.map(q => 
-        q.id === nextItem.id ? { ...q, status: 'serving' } : 
-        q.status === 'serving' ? { ...q, status: 'completed' } : q
-      ));
-      setCurrentServing(nextItem.token);
-      toast.success(`${language === 'mr' ? 'पुढील टोकन कॉल केला' : 'Called next token'}: ${nextItem.token}`);
+  const handleCallNext = async () => {
+    try {
+      const nextToken = await callNextMutation.mutateAsync();
+      if (nextToken) {
+        toast.success(
+          language === 'mr' 
+            ? `पुढील टोकन: ${nextToken.token_number}` 
+            : `Next token: ${nextToken.token_number}`
+        );
+      } else {
+        toast.info(
+          language === 'mr' 
+            ? 'रांगेत कोणी नाही' 
+            : 'No one in queue'
+        );
+      }
+    } catch (error) {
+      toast.error(language === 'mr' ? 'त्रुटी आली' : 'Error occurred');
     }
   };
 
-  const skipCurrent = () => {
-    const servingItem = queue.find(q => q.status === 'serving');
-    if (servingItem) {
-      setQueue(prev => prev.map(q => 
-        q.id === servingItem.id ? { ...q, status: 'skipped' } : q
-      ));
-      callNext();
-      toast.info(`${language === 'mr' ? 'टोकन वगळला' : 'Skipped token'}: ${servingItem.token}`);
+  const handleComplete = async () => {
+    if (!currentlyServing) return;
+    try {
+      await updateStatusMutation.mutateAsync({ tokenId: currentlyServing.id, status: 'completed' });
+      toast.success(language === 'mr' ? 'सेवा पूर्ण' : 'Service completed');
+    } catch (error) {
+      toast.error(language === 'mr' ? 'त्रुटी आली' : 'Error occurred');
     }
   };
 
-  const completeCurrent = () => {
-    const servingItem = queue.find(q => q.status === 'serving');
-    if (servingItem) {
-      setQueue(prev => prev.map(q => 
-        q.id === servingItem.id ? { ...q, status: 'completed' } : q
-      ));
-      setCurrentServing(null);
-      toast.success(`${language === 'mr' ? 'सेवा पूर्ण' : 'Service completed'}: ${servingItem.token}`);
+  const handleSkip = async () => {
+    if (!currentlyServing) return;
+    try {
+      await updateStatusMutation.mutateAsync({ tokenId: currentlyServing.id, status: 'skipped' });
+      toast.info(language === 'mr' ? 'टोकन वगळला' : 'Token skipped');
+    } catch (error) {
+      toast.error(language === 'mr' ? 'त्रुटी आली' : 'Error occurred');
     }
   };
 
   const announceToken = () => {
-    toast.success(language === 'mr' ? 'टोकन घोषित केला' : 'Token announced');
+    if (currentlyServing) {
+      toast.success(
+        language === 'mr' 
+          ? `टोकन ${currentlyServing.token_number} घोषित केला` 
+          : `Token ${currentlyServing.token_number} announced`
+      );
+    }
   };
 
   const refreshQueue = () => {
+    refetch();
     toast.success(language === 'mr' ? 'रांग रिफ्रेश केली' : 'Queue refreshed');
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'serving': return <Badge variant="success">{language === 'mr' ? 'सेवेत' : 'Serving'}</Badge>;
-      case 'waiting': return <Badge variant="secondary">{language === 'mr' ? 'प्रतीक्षेत' : 'Waiting'}</Badge>;
+      case 'waiting': 
+      case 'pending': return <Badge variant="secondary">{language === 'mr' ? 'प्रतीक्षेत' : 'Waiting'}</Badge>;
       case 'completed': return <Badge variant="default">{language === 'mr' ? 'पूर्ण' : 'Completed'}</Badge>;
       case 'skipped': return <Badge variant="destructive">{language === 'mr' ? 'वगळले' : 'Skipped'}</Badge>;
       default: return null;
     }
   };
+
+  const allTokens = [
+    ...(currentlyServing ? [currentlyServing] : []),
+    ...waitingQueue,
+  ];
 
   return (
     <DashboardLayout>
@@ -115,7 +167,7 @@ const QueueManagement: React.FC = () => {
               <RefreshCw className="h-4 w-4 mr-2" />
               {language === 'mr' ? 'रिफ्रेश' : 'Refresh'}
             </Button>
-            <Button variant="outline" onClick={announceToken}>
+            <Button variant="outline" onClick={announceToken} disabled={!currentlyServing}>
               <Volume2 className="h-4 w-4 mr-2" />
               {language === 'mr' ? 'घोषणा' : 'Announce'}
             </Button>
@@ -124,7 +176,7 @@ const QueueManagement: React.FC = () => {
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat, i) => (
+          {statCards.map((stat, i) => (
             <Card key={i} variant="stat">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -148,15 +200,34 @@ const QueueManagement: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
-              <Button variant="success" size="lg" onClick={callNext}>
-                <Play className="h-5 w-5 mr-2" />
+              <Button 
+                variant="success" 
+                size="lg" 
+                onClick={handleCallNext}
+                disabled={callNextMutation.isPending}
+              >
+                {callNextMutation.isPending ? (
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <Play className="h-5 w-5 mr-2" />
+                )}
                 {language === 'mr' ? 'पुढील कॉल करा' : 'Call Next'}
               </Button>
-              <Button variant="default" size="lg" onClick={completeCurrent}>
+              <Button 
+                variant="default" 
+                size="lg" 
+                onClick={handleComplete}
+                disabled={!currentlyServing || updateStatusMutation.isPending}
+              >
                 <CheckCircle className="h-5 w-5 mr-2" />
                 {language === 'mr' ? 'पूर्ण करा' : 'Complete'}
               </Button>
-              <Button variant="outline" size="lg" onClick={skipCurrent}>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                onClick={handleSkip}
+                disabled={!currentlyServing || updateStatusMutation.isPending}
+              >
                 <SkipForward className="h-5 w-5 mr-2" />
                 {language === 'mr' ? 'वगळा' : 'Skip'}
               </Button>
@@ -170,43 +241,53 @@ const QueueManagement: React.FC = () => {
             <CardTitle>{language === 'mr' ? 'वर्तमान रांग' : 'Current Queue'}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium">
-                      {language === 'mr' ? 'टोकन' : 'Token'}
-                    </th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium">
-                      {language === 'mr' ? 'नाव' : 'Name'}
-                    </th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium">
-                      {language === 'mr' ? 'सेवा' : 'Service'}
-                    </th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium">
-                      {language === 'mr' ? 'प्रतीक्षा वेळ' : 'Wait Time'}
-                    </th>
-                    <th className="text-left py-3 px-4 text-muted-foreground font-medium">
-                      {language === 'mr' ? 'स्थिती' : 'Status'}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {queue.map((item) => (
-                    <tr 
-                      key={item.id} 
-                      className={`border-b border-border hover:bg-muted/50 ${item.status === 'serving' ? 'bg-success/10' : ''}`}
-                    >
-                      <td className="py-3 px-4 font-mono font-semibold">{item.token}</td>
-                      <td className="py-3 px-4">{item.name}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{item.service}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{item.waitTime}</td>
-                      <td className="py-3 px-4">{getStatusBadge(item.status)}</td>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : allTokens.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">
+                {language === 'mr' ? 'रांगेत कोणी नाही' : 'No one in queue'}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-4 text-muted-foreground font-medium">
+                        {language === 'mr' ? 'टोकन' : 'Token'}
+                      </th>
+                      <th className="text-left py-3 px-4 text-muted-foreground font-medium">
+                        {language === 'mr' ? 'सेवा' : 'Service'}
+                      </th>
+                      <th className="text-left py-3 px-4 text-muted-foreground font-medium">
+                        {language === 'mr' ? 'कार्यालय' : 'Office'}
+                      </th>
+                      <th className="text-left py-3 px-4 text-muted-foreground font-medium">
+                        {language === 'mr' ? 'वेळ' : 'Time'}
+                      </th>
+                      <th className="text-left py-3 px-4 text-muted-foreground font-medium">
+                        {language === 'mr' ? 'स्थिती' : 'Status'}
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {allTokens.map((item) => (
+                      <tr 
+                        key={item.id} 
+                        className={`border-b border-border hover:bg-muted/50 ${item.status === 'serving' ? 'bg-success/10' : ''}`}
+                      >
+                        <td className="py-3 px-4 font-mono font-semibold">{item.token_number}</td>
+                        <td className="py-3 px-4">{item.service_name}</td>
+                        <td className="py-3 px-4 text-muted-foreground">{item.office_name}</td>
+                        <td className="py-3 px-4 text-muted-foreground">{item.appointment_time}</td>
+                        <td className="py-3 px-4">{getStatusBadge(item.status)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

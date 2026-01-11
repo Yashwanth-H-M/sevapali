@@ -22,65 +22,39 @@ import {
   Eye,
   RefreshCw,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useMyTokens, useCancelToken, Token } from '@/hooks/useTokens';
+import { format, parseISO } from 'date-fns';
 
 const MyTokens: React.FC = () => {
   const { language } = useLanguage();
+  const { data: tokens, isLoading, refetch } = useMyTokens();
+  const cancelMutation = useCancelToken();
 
-  const tokens = [
-    {
-      id: 'TK-2025-001234',
-      office: language === 'mr' ? 'आरटीओ पुणे' : 'RTO Pune',
-      service: language === 'mr' ? 'वाहन नोंदणी' : 'Vehicle Registration',
-      date: '10 Jan 2025',
-      time: '10:30 AM',
-      position: 4,
-      estimatedWait: 25,
-      status: 'active',
-    },
-    {
-      id: 'TK-2025-001235',
-      office: language === 'mr' ? 'तहसील कार्यालय' : 'Tahsil Office',
-      service: language === 'mr' ? '७/१२ उतारा' : '7/12 Extract',
-      date: '11 Jan 2025',
-      time: '11:00 AM',
-      position: null,
-      estimatedWait: null,
-      status: 'upcoming',
-    },
-    {
-      id: 'TK-2025-001200',
-      office: language === 'mr' ? 'ससून रुग्णालय' : 'Sassoon Hospital',
-      service: language === 'mr' ? 'बाह्यरुग्ण विभाग' : 'OPD Consultation',
-      date: '08 Jan 2025',
-      time: '09:30 AM',
-      position: null,
-      estimatedWait: null,
-      status: 'completed',
-    },
-    {
-      id: 'TK-2025-001180',
-      office: language === 'mr' ? 'पुणे महानगरपालिका' : 'Pune Municipal Corp',
-      service: language === 'mr' ? 'मालमत्ता कर' : 'Property Tax',
-      date: '05 Jan 2025',
-      time: '02:00 PM',
-      position: null,
-      estimatedWait: null,
-      status: 'cancelled',
-    },
-  ];
-
-  const handleViewDetails = (tokenId: string) => {
-    toast.info(language === 'mr' ? `टोकन ${tokenId} तपशील` : `Token ${tokenId} details`);
-  };
-
-  const handleRefreshPosition = (tokenId: string) => {
+  const handleRefreshPosition = () => {
+    refetch();
     toast.success(language === 'mr' ? 'स्थिती अपडेट केली' : 'Status refreshed');
   };
 
-  const handleCancelToken = (tokenId: string) => {
-    toast.success(language === 'mr' ? 'टोकन रद्द केले' : 'Token cancelled');
+  const handleCancelToken = async (tokenId: string) => {
+    try {
+      await cancelMutation.mutateAsync(tokenId);
+      toast.success(language === 'mr' ? 'टोकन रद्द केले' : 'Token cancelled');
+    } catch (error) {
+      toast.error(language === 'mr' ? 'त्रुटी आली' : 'Error cancelling token');
+    }
+  };
+
+  const getStatus = (token: Token) => {
+    const today = new Date().toISOString().split('T')[0];
+    if (token.status === 'cancelled') return 'cancelled';
+    if (token.status === 'completed') return 'completed';
+    if (token.status === 'serving') return 'active';
+    if (token.appointment_date === today && (token.status === 'waiting' || token.status === 'pending')) return 'active';
+    if (token.appointment_date > today) return 'upcoming';
+    return 'completed';
   };
 
   const getStatusBadge = (status: string) => {
@@ -113,6 +87,14 @@ const MyTokens: React.FC = () => {
     }
   };
 
+  const formatDate = (dateStr: string) => {
+    try {
+      return format(parseISO(dateStr), 'dd MMM yyyy');
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
@@ -125,94 +107,115 @@ const MyTokens: React.FC = () => {
               {language === 'mr' ? 'तुमच्या सर्व टोकनची स्थिती पहा' : 'View the status of all your tokens'}
             </p>
           </div>
+          <Button variant="outline" onClick={handleRefreshPosition}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            {language === 'mr' ? 'रिफ्रेश' : 'Refresh'}
+          </Button>
         </div>
 
-        <div className="space-y-4">
-          {tokens.map((token) => (
-            <Card key={token.id} variant="elevated" className={token.status === 'active' ? 'border-success/50' : ''}>
-              <CardContent className="p-4 md:p-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-start gap-4">
-                    <div className="hidden md:flex w-12 h-12 rounded-xl bg-primary/10 items-center justify-center">
-                      {getStatusIcon(token.status)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        {getStatusBadge(token.status)}
-                        <span className="text-sm font-mono text-muted-foreground">{token.id}</span>
-                      </div>
-                      <h3 className="font-semibold text-foreground text-lg">{token.service}</h3>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {token.office}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {token.date}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" />
-                          {token.time}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    {token.status === 'active' && token.position && (
-                      <div className="flex items-center gap-3">
-                        <div className="text-center px-4 py-2 bg-primary/10 rounded-xl">
-                          <p className="text-xl font-bold text-primary">#{token.position}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {language === 'mr' ? 'रांगेत' : 'In Queue'}
-                          </p>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : !tokens || tokens.length === 0 ? (
+          <Card variant="elevated">
+            <CardContent className="p-8 text-center">
+              <Ticket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">
+                {language === 'mr' ? 'तुमची कोणतेही टोकन नाहीत' : 'You have no tokens'}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {tokens.map((token) => {
+              const status = getStatus(token);
+              return (
+                <Card key={token.id} variant="elevated" className={status === 'active' ? 'border-success/50' : ''}>
+                  <CardContent className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="hidden md:flex w-12 h-12 rounded-xl bg-primary/10 items-center justify-center">
+                          {getStatusIcon(status)}
                         </div>
-                        <div className="text-center px-4 py-2 bg-accent/10 rounded-xl">
-                          <p className="text-xl font-bold text-accent">{token.estimatedWait}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {language === 'mr' ? 'मिनिटे' : 'min'}
-                          </p>
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            {getStatusBadge(status)}
+                            <span className="text-sm font-mono text-muted-foreground">{token.token_number}</span>
+                          </div>
+                          <h3 className="font-semibold text-foreground text-lg">{token.service_name}</h3>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5" />
+                              {token.office_name}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5" />
+                              {formatDate(token.appointment_date)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5" />
+                              {token.appointment_time}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    )}
 
-                    {(token.status === 'active' || token.status === 'upcoming') && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-5 w-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewDetails(token.id)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            {language === 'mr' ? 'तपशील पहा' : 'View Details'}
-                          </DropdownMenuItem>
-                          {token.status === 'active' && (
-                            <DropdownMenuItem onClick={() => handleRefreshPosition(token.id)}>
-                              <RefreshCw className="h-4 w-4 mr-2" />
-                              {language === 'mr' ? 'स्थिती रिफ्रेश करा' : 'Refresh Status'}
-                            </DropdownMenuItem>
-                          )}
-                          {token.status === 'upcoming' && (
-                            <DropdownMenuItem 
-                              onClick={() => handleCancelToken(token.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              {language === 'mr' ? 'टोकन रद्द करा' : 'Cancel Token'}
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                      <div className="flex items-center gap-4">
+                        {status === 'active' && token.position_in_queue && (
+                          <div className="flex items-center gap-3">
+                            <div className="text-center px-4 py-2 bg-primary/10 rounded-xl">
+                              <p className="text-xl font-bold text-primary">#{token.position_in_queue}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {language === 'mr' ? 'रांगेत' : 'In Queue'}
+                              </p>
+                            </div>
+                            {token.estimated_wait_minutes && (
+                              <div className="text-center px-4 py-2 bg-accent/10 rounded-xl">
+                                <p className="text-xl font-bold text-accent">{token.estimated_wait_minutes}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {language === 'mr' ? 'मिनिटे' : 'min'}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {(status === 'active' || status === 'upcoming') && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {status === 'active' && (
+                                <DropdownMenuItem onClick={handleRefreshPosition}>
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  {language === 'mr' ? 'स्थिती रिफ्रेश करा' : 'Refresh Status'}
+                                </DropdownMenuItem>
+                              )}
+                              {status === 'upcoming' && (
+                                <DropdownMenuItem 
+                                  onClick={() => handleCancelToken(token.id)}
+                                  className="text-destructive"
+                                  disabled={cancelMutation.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  {language === 'mr' ? 'टोकन रद्द करा' : 'Cancel Token'}
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
