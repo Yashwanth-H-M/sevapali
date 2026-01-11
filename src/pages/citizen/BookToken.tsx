@@ -21,8 +21,10 @@ import {
   ArrowLeft,
   Ticket,
   Brain,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useBookToken } from '@/hooks/useTokens';
 
 const BookToken: React.FC = () => {
   const { language } = useLanguage();
@@ -83,28 +85,47 @@ const BookToken: React.FC = () => {
     { id: '15:30', label: '03:30 PM', available: true },
   ];
 
+  const bookTokenMutation = useBookToken();
+
   const handleBook = async () => {
     setIsBooking(true);
-    
-    // Simulate booking API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
     const office = offices.find(o => o.id === selectedOffice);
     const service = services[selectedOffice]?.find(s => s.id === selectedService);
     
-    setTokenDetails({
-      tokenNumber: `TK-2025-${Math.floor(100000 + Math.random() * 900000)}`,
-      office: office?.name,
-      service: service?.name,
-      date: selectedDate ? format(selectedDate, 'dd MMM yyyy') : '',
-      time: timeSlots.find(s => s.id === selectedSlot)?.label,
-      estimatedWait: Math.floor(15 + Math.random() * 30),
-      position: Math.floor(1 + Math.random() * 10),
-    });
-    
-    setIsBooking(false);
-    setBookingComplete(true);
-    toast.success(language === 'mr' ? 'टोकन यशस्वीरित्या बुक झाले!' : 'Token booked successfully!');
+    if (!office || !service || !selectedDate) {
+      toast.error(language === 'mr' ? 'कृपया सर्व माहिती भरा' : 'Please fill all details');
+      setIsBooking(false);
+      return;
+    }
+
+    try {
+      const token = await bookTokenMutation.mutateAsync({
+        office_id: selectedOffice,
+        office_name: office.name,
+        service_id: selectedService,
+        service_name: service.name,
+        appointment_date: format(selectedDate, 'yyyy-MM-dd'),
+        appointment_time: timeSlots.find(s => s.id === selectedSlot)?.label || selectedSlot,
+      });
+
+      setTokenDetails({
+        tokenNumber: token.token_number,
+        office: office.name,
+        service: service.name,
+        date: selectedDate ? format(selectedDate, 'dd MMM yyyy') : '',
+        time: timeSlots.find(s => s.id === selectedSlot)?.label,
+        estimatedWait: token.estimated_wait_minutes || Math.floor(15 + Math.random() * 30),
+        position: token.position_in_queue || Math.floor(1 + Math.random() * 10),
+      });
+      
+      setBookingComplete(true);
+      toast.success(language === 'mr' ? 'टोकन यशस्वीरित्या बुक झाले!' : 'Token booked successfully!');
+    } catch (error: any) {
+      toast.error(error.message || (language === 'mr' ? 'त्रुटी आली' : 'Error booking token'));
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   const canProceed = () => {

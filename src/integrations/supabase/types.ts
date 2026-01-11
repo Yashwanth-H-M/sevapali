@@ -80,6 +80,63 @@ export type Database = {
         }
         Relationships: []
       }
+      tokens: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          created_at: string
+          estimated_wait_minutes: number | null
+          id: string
+          office_id: string
+          office_name: string
+          position_in_queue: number | null
+          served_at: string | null
+          served_by: string | null
+          service_id: string
+          service_name: string
+          status: string
+          token_number: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          created_at?: string
+          estimated_wait_minutes?: number | null
+          id?: string
+          office_id: string
+          office_name: string
+          position_in_queue?: number | null
+          served_at?: string | null
+          served_by?: string | null
+          service_id: string
+          service_name: string
+          status?: string
+          token_number: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          created_at?: string
+          estimated_wait_minutes?: number | null
+          id?: string
+          office_id?: string
+          office_name?: string
+          position_in_queue?: number | null
+          served_at?: string | null
+          served_by?: string | null
+          service_id?: string
+          service_name?: string
+          status?: string
+          token_number?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
