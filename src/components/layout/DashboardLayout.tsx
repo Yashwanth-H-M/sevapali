@@ -53,9 +53,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
   const menuItems = isCitizen ? citizenMenuItems : officialMenuItems;
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const handleLogout = async () => {
-    await logout();
-    navigate('/');
+    if (isLoggingOut) return; // Prevent multiple clicks
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate('/', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const toggleLanguage = () => {
@@ -178,9 +186,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               variant="ghost"
               className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleLogout}
+              disabled={isLoggingOut}
             >
               <LogOut className="h-5 w-5" />
-              {t.nav.logout}
+              {isLoggingOut ? (language === 'mr' ? 'बाहेर पडत आहे...' : 'Logging out...') : t.nav.logout}
             </Button>
           </div>
         </div>
