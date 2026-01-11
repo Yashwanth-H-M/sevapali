@@ -51,11 +51,16 @@ CREATE FUNCTION public.handle_new_user() RETURNS trigger
     SET search_path TO 'public'
     AS $$
 BEGIN
+  -- Insert profile
   INSERT INTO public.profiles (user_id, full_name)
-  VALUES (NEW.id, NEW.raw_user_meta_data ->> 'full_name');
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'full_name', ''));
   
+  -- Insert user role
   INSERT INTO public.user_roles (user_id, role)
-  VALUES (NEW.id, (NEW.raw_user_meta_data ->> 'role')::app_role);
+  VALUES (
+    NEW.id, 
+    COALESCE((NEW.raw_user_meta_data->>'role')::public.app_role, 'citizen')
+  );
   
   RETURN NEW;
 END;
@@ -170,6 +175,14 @@ ALTER TABLE ONLY public.profiles
 
 ALTER TABLE ONLY public.user_roles
     ADD CONSTRAINT user_roles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_roles user_roles_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_roles
+    ADD CONSTRAINT user_roles_user_id_key UNIQUE (user_id);
 
 
 --
