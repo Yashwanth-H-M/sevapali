@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Language, getTranslation, translations } from '@/lib/i18n';
 
 type TranslationType = typeof translations.en;
@@ -15,8 +15,21 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [language, setLanguage] = useState<Language>('en');
   const t = getTranslation(language);
 
+  // Persist language preference
+  useEffect(() => {
+    const savedLang = localStorage.getItem('sevapali-lang') as Language;
+    if (savedLang && (savedLang === 'en' || savedLang === 'mr')) {
+      setLanguage(savedLang);
+    }
+  }, []);
+
+  const handleSetLanguage = (lang: Language) => {
+    setLanguage(lang);
+    localStorage.setItem('sevapali-lang', lang);
+  };
+
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage: handleSetLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );
