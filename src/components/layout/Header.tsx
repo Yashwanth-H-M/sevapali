@@ -56,6 +56,11 @@ const Header: React.FC = () => {
             }`}>
               {t.nav.about}
             </Link>
+            <Link to="/feedback" className={`text-sm font-medium transition-colors hover:text-accent ${
+              isLandingPage ? 'text-primary-foreground/90' : 'text-foreground'
+            }`}>
+              {t.nav.feedback}
+            </Link>
           </nav>
 
           {/* Actions */}
@@ -132,6 +137,13 @@ const Header: React.FC = () => {
                 onClick={() => setIsMenuOpen(false)}
               >
                 {t.nav.about}
+              </Link>
+              <Link
+                to="/feedback"
+                className="px-4 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-lg"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {t.nav.feedback}
               </Link>
             </nav>
           </div>
