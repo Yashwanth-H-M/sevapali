@@ -46,35 +46,66 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const fetchRole = async (userId: string) => {
-    const { data: roleData } = await supabase
+    const { data: roleData, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', userId)
       .maybeSingle();
-    
-    if (roleData) {
-      setRole(roleData.role as UserRole);
+
+    if (error) {
+      console.error('Failed to fetch role:', error);
+      setRole(null);
+      return;
     }
+
+    setRole((roleData?.role as UserRole) ?? null);
+  };
+
+  const ensureAppRecords = async (u: User) => {
+    const desiredRole = (u.user_metadata?.role as UserRole) ?? 'citizen';
+    const fullName = (u.user_metadata?.full_name as string | undefined) ?? null;
+
+    // Best-effort: if rows already exist this is a no-op due to onConflict.
+    await Promise.all([
+      supabase.from('profiles').upsert(
+        {
+          user_id: u.id,
+          full_name: fullName,
+        },
+        { onConflict: 'user_id' }
+      ),
+      supabase.from('user_roles').upsert(
+        {
+          user_id: u.id,
+          role: desiredRole === 'official' ? 'official' : 'citizen',
+        },
+        { onConflict: 'user_id' }
+      ),
+    ]);
   };
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
           // Use setTimeout to avoid potential deadlock with Supabase client
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-            fetchRole(session.user.id);
+          setTimeout(async () => {
+            await ensureAppRecords(session.user);
+            await Promise.all([
+              fetchProfile(session.user.id),
+              fetchRole(session.user.id),
+            ]);
+            setIsLoading(false);
           }, 0);
         } else {
           setProfile(null);
           setRole(null);
+          setIsLoading(false);
         }
-        setIsLoading(false);
       }
     );
 
@@ -82,12 +113,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        fetchProfile(session.user.id);
-        fetchRole(session.user.id);
+        setTimeout(async () => {
+          await ensureAppRecords(session.user);
+          await Promise.all([
+            fetchProfile(session.user.id),
+            fetchRole(session.user.id),
+          ]);
+          setIsLoading(false);
+        }, 0);
+      } else {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -103,19 +141,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const register = async (email: string, password: string, fullName: string, role: UserRole) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: window.location.origin,
         data: {
           full_name: fullName,
-          role: role,
+          role,
         },
       },
     });
-    
+
     if (error) throw error;
+
+    // IMPORTANT: create app-side records (profiles + user_roles)
+    // We rely on DB RLS (auth.uid() = user_id) for safety.
+    const userId = data.user?.id;
+    if (!userId) return;
+
+    const desiredRole: Exclude<UserRole, null> = role ?? 'citizen';
+
+    const [{ error: profileError }, { error: roleError }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .upsert(
+          {
+            user_id: userId,
+            full_name: fullName || null,
+          },
+          { onConflict: 'user_id' }
+        ),
+      supabase
+        .from('user_roles')
+        .upsert(
+          {
+            user_id: userId,
+            role: desiredRole,
+          },
+          { onConflict: 'user_id' }
+        ),
+    ]);
+
+    if (profileError) throw profileError;
+    if (roleError) throw roleError;
   };
 
   const logout = async () => {
