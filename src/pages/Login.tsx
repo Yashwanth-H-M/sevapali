@@ -13,19 +13,19 @@ import { toast } from 'sonner';
 
 const Login: React.FC = () => {
   const { t, language } = useLanguage();
-  const { login, role, isAuthenticated } = useAuth();
+  const { login, role, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already authenticated based on role
+  // Redirect if already authenticated based on role (wait for auth to finish loading)
   React.useEffect(() => {
-    if (isAuthenticated && role) {
-      navigate(role === 'official' ? '/official/dashboard' : '/citizen/dashboard');
+    if (!authLoading && isAuthenticated && role) {
+      navigate(role === 'official' ? '/official/dashboard' : '/citizen/dashboard', { replace: true });
     }
-  }, [isAuthenticated, role, navigate]);
+  }, [authLoading, isAuthenticated, role, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
